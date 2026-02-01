@@ -1,0 +1,3 @@
+# Placeholder for checkpoints directory
+# Model checkpoints (.pt files) are saved here during training
+# These files are excluded from Git (see .gitignore)

@@ -1,0 +1,24 @@
+# Core dependencies for Failure-Aware ViT project
+# Dataset analysis & preprocessing
+opencv-python>=4.8.0
+numpy>=1.24.0
+tqdm>=4.65.0
+matplotlib>=3.7.0
+Pillow>=10.0.0
+
+# Deep learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Training utilities
+scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# API & deployment (Stage 8+)
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+
+# Monitoring & evaluation (Stage 7+)
+seaborn>=0.12.0
+pandas>=2.0.0
