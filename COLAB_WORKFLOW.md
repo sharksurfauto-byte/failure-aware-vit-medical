@@ -82,7 +82,7 @@ When training, pass `--checkpoint-dir` pointing to Drive:
 !bash scripts/train_cnn.sh
 ```
 
-**With Drive** (recommended):
+**With Drive** (recommended - copy-paste this exact command):
 ```bash
 !python scripts/train.py \
   --model cnn \
@@ -102,7 +102,7 @@ When training, pass `--checkpoint-dir` pointing to Drive:
 
 ### 2. Train ViT Baseline
 
-**With Drive** (recommended):
+**With Drive** (recommended - copy-paste this exact command):
 ```bash
 !python scripts/train.py \
   --model vit \
