@@ -14,6 +14,44 @@ This project uses **Google Colab as a remote GPU compute environment**. All code
 
 ---
 
+## Checkpoint Persistence (RECOMMENDED - Do This First)
+
+By default, Colab runtime resets lose all data. **Mount Google Drive** to persist checkpoints across sessions.
+
+### Step 1: Mount Drive
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+**Authorize** when prompted. You'll see: `/content/drive/MyDrive/`
+
+### Step 2: Create Checkpoint Directory
+
+```bash
+!mkdir -p /content/drive/MyDrive/failure-aware-vit-medical/checkpoints
+```
+
+### Step 3: Use Drive for Checkpoints
+
+When training, pass `--checkpoint-dir` pointing to Drive:
+
+```bash
+--checkpoint-dir /content/drive/MyDrive/failure-aware-vit-medical/checkpoints
+```
+
+**Benefits**:
+- ✅ Checkpoints survive runtime crashes
+- ✅ Resume training from saved state
+- ✅ No need to download models manually
+- ✅ Accessible from any Colab session
+
+> [!IMPORTANT]
+> **Always mount Drive before training**. If Colab crashes mid-training, your checkpoint is safe in Drive.
+
+---
+
 ## Quick Start (3 Commands)
 
 ```bash
@@ -34,36 +72,107 @@ This project uses **Google Colab as a remote GPU compute environment**. All code
 
 ## Full Training Workflow
 
+> [!TIP]
+> **Mount Drive first** (see [Checkpoint Persistence](#checkpoint-persistence-recommended---do-this-first)) to save checkpoints permanently.
+
 ### 1. Train CNN Baseline
 
+**Without Drive** (checkpoints lost on reset):
 ```bash
 !bash scripts/train_cnn.sh
 ```
 
+**With Drive** (recommended):
+```bash
+!python scripts/train.py \
+  --model cnn \
+  --epochs 20 \
+  --batch-size 64 \
+  --lr 3e-4 \
+  --weight-decay 0.01 \
+  --patience 5 \
+  --device cuda \
+  --checkpoint-dir /content/drive/MyDrive/failure-aware-vit-medical/checkpoints
+```
+
 **Expected output**:
 - Training time: ~20-30 minutes
-- Checkpoint: `checkpoints/cnn_best.pt`
+- Checkpoint: `checkpoints/cnn_best.pt` (or Drive path if specified)
 - Validation accuracy: >90%
 
 ### 2. Train ViT Baseline
 
+**With Drive** (recommended):
 ```bash
-!bash scripts/train_vit.sh
+!python scripts/train.py \
+  --model vit \
+  --epochs 20 \
+  --batch-size 64 \
+  --lr 3e-4 \
+  --weight-decay 0.01 \
+  --patience 5 \
+  --device cuda \
+  --checkpoint-dir /content/drive/MyDrive/failure-aware-vit-medical/checkpoints
 ```
 
 **Expected output**:
 - Training time: ~30-45 minutes (slower than CNN)
-- Checkpoint: `checkpoints/vit_best.pt`
+- Checkpoint: `vit_best.pt` in Drive
 - Validation accuracy: comparable to CNN
 
 **If you get CUDA OOM error**:
-Edit `scripts/train_vit.sh` and change `--batch-size 64` to `--batch-size 32`.
+Reduce batch size to 32:
+```bash
+--batch-size 32
+```
+
+### 3. Loading Saved Checkpoints (Resume or Inference)
+
+```python
+import torch
+from src.models.cnn_baseline import CNNBaseline
+from src.models.vit_baseline import ViTBaseline
+
+# Load CNN
+model = CNNBaseline(num_classes=2, dropout=0.3)
+checkpoint = torch.load(
+    "/content/drive/MyDrive/failure-aware-vit-medical/checkpoints/cnn_best.pt",
+    map_location="cuda"
+)
+model.load_state_dict(checkpoint['model_state_dict'])
+model.eval()
+
+# Load ViT
+model = ViTBaseline(num_classes=2, embed_dim=384, depth=6, num_heads=6)
+checkpoint = torch.load(
+    "/content/drive/MyDrive/failure-aware-vit-medical/checkpoints/vit_best.pt",
+    map_location="cuda"
+)
+model.load_state_dict(checkpoint['model_state_dict'])
+model.eval()
+```
+
+**No retraining needed** - model ready for inference or evaluation.
 
 ---
 
 ## Downloading Checkpoints
 
-After training completes:
+### If Using Drive (Recommended)
+
+**No download needed!** Checkpoints are already in:
+```
+/content/drive/MyDrive/failure-aware-vit-medical/checkpoints/
+```
+
+Access them from:
+- Any Colab session (remount Drive)
+- Google Drive web interface
+- Local machine (install Google Drive Desktop)
+
+### If Using Local Colab Storage
+
+Only if you didn't use Drive, package and download:
 
 ```bash
 # Package checkpoints
