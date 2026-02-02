@@ -30,7 +30,7 @@ class MalariaDataset(Dataset):
         """
         Args:
             split: 'train', 'val', 'test_clean', or 'stress_source'
-            splits_path: Path to splits.json file
+            splits_path: Path to splits.json file (relative to project root or absolute)
             compute_stats: If True, compute dataset stats (only for train split)
         """
         assert split in ['train', 'val', 'test_clean', 'stress_source'], \
@@ -39,20 +39,33 @@ class MalariaDataset(Dataset):
         self.split = split
         self.compute_stats = compute_stats
         
+        # Determine project root (assuming dataset.py is in src/)
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent
+        
+        # Resolve splits_path relative to project root if not absolute
+        splits_file = Path(splits_path)
+        if not splits_file.is_absolute():
+            splits_file = project_root / splits_file
+        
         # Load splits
-        with open(splits_path, 'r') as f:
+        with open(splits_file, 'r') as f:
             splits_data = json.load(f)
         
-        # Get image paths for this split
+        # Get image paths for this split (they're stored as relative paths)
         if split == 'test_clean':
-            self.image_paths = splits_data['splits']['test_clean']
+            relative_paths = splits_data['splits']['test_clean']
         elif split == 'stress_source':
-            self.image_paths = splits_data['splits']['stress_source']
+            relative_paths = splits_data['splits']['stress_source']
         else:
-            self.image_paths = splits_data['splits'][split]
+            relative_paths = splits_data['splits'][split]
         
-        # Get small images metadata
-        self.small_images = set(splits_data['metadata']['small_images'])
+        # Convert relative paths to absolute by joining with project root
+        self.image_paths = [str(project_root / p) for p in relative_paths]
+        
+        # Get small images metadata (also relative paths)
+        small_images_relative = splits_data['metadata']['small_images']
+        self.small_images = {str(project_root / p) for p in small_images_relative}
         
         # Define transforms
         self._setup_transforms()

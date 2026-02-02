@@ -152,11 +152,18 @@ def create_splits():
     # Split test into clean and stress source
     clean_test, stress_source = split_test_into_clean_and_stress(test_set)
     
-    # Convert to strings (JSON serializable)
-    train_set = [str(p) for p in train_set]
-    val_set = [str(p) for p in val_set]
-    clean_test = [str(p) for p in clean_test]
-    stress_source = [str(p) for p in stress_source]
+    # Convert to relative POSIX paths from PROJECT_ROOT for cross-platform compatibility
+    # This ensures splits.json works on both Windows (local) and Linux (Colab)
+    def make_relative_posix(p):
+        """Convert absolute path to relative POSIX path from project root"""
+        rel_path = Path(p).relative_to(PROJECT_ROOT)
+        return rel_path.as_posix()
+    
+    train_set = [make_relative_posix(p) for p in train_set]
+    val_set = [make_relative_posix(p) for p in val_set]
+    clean_test = [make_relative_posix(p) for p in clean_test]
+    stress_source = [make_relative_posix(p) for p in stress_source]
+    small_images = [make_relative_posix(p) for p in small_images]
     
     # Print statistics
     print("\n" + "=" * 60)
