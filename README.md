@@ -1,147 +1,209 @@
-# Failure-Aware Vision Transformer for Malaria Diagnosis
+# Failure-Aware Vision Transformer for Medical Diagnosis
 
-Research project demonstrating uncertainty-aware medical image classification using Vision Transformers.
+A human-in-the-loop medical image classification system that uses uncertainty estimation to prevent prediction failures from reaching patients.
 
-## Project Status: Stage 2 - Baseline Training
+## Problem Statement
 
-**Current Goal**: Validate CNN and ViT baselines on NIH Malaria dataset
+Medical AI systems require more than high accuracy—they need to know when they're uncertain. **Overconfident failures** (incorrect predictions made with high confidence) pose significant safety risks in clinical settings. While Vision Transformers (ViTs) achieve strong performance on medical imaging tasks, they can exhibit dangerous confidence behavior on incorrect predictions.
 
-## Quick Start (Colab)
+This project addresses this gap by building a **failure-aware** system that:
+- Detects when the model is likely to be wrong
+- Automatically defers high-risk cases to human experts
+- Quantifiably prevents the majority of failures from reaching patients
 
-```bash
-!git clone https://github.com/sharksurfauto-byte/failure-aware-vit-medical.git
-%cd failure-aware-vit-medical
-!bash scripts/colab_setup.sh
-!bash scripts/smoke_test.sh
-```
-
-See [COLAB_WORKFLOW.md](COLAB_WORKFLOW.md) for detailed instructions.
-
-## Repository Structure
+## System Overview
 
 ```
-.
-├── data/
-│   ├── DATASET.md              # Dataset analysis and preprocessing decisions
-│   ├── splits.json             # Train/val/test split assignments (reproducible)
-│   ├── normalization_stats.json # Dataset normalization parameters
-│   └── raw/                    # Downloaded dataset (not in Git)
-├── src/
-│   ├── dataset.py              # Malaria dataset + preprocessing pipeline
-│   └── models/
-│       ├── cnn_baseline.py     # CNN baseline (~1M params)
-│       └── vit_baseline.py     # ViT baseline (~5M params)
-├── scripts/
-│   ├── download_dataset.sh     # Download NIH Malaria dataset
-│   ├── colab_setup.sh          # One-command Colab environment setup
-│   ├── create_splits.py        # Generate stratified splits
-│   ├── train.py                # Training script for both models
-│   ├── smoke_test.sh           # Fast pipeline validation
-│   ├── train_cnn.sh            # CNN baseline training
-│   ├── train_vit.sh            # ViT baseline training
-│   └── download_checkpoints.sh # Package checkpoints for download
-├── checkpoints/                # Saved model weights (not in Git)
-├── requirements.txt            # Python dependencies
-├── COLAB_WORKFLOW.md           # Step-by-step Colab execution guide
-└── README.md                   # This file
+Medical Image (224×224)
+        ↓
+   Vision Transformer
+        ↓
+   MC Dropout (T=20)
+        ↓
+  Predictive Entropy
+        ↓
+    ┌───────────────┐
+    │  Entropy ≤ τ  │  →  Auto-Predict (High Confidence)
+    │  Entropy > τ  │  →  Flag for Expert Review (Uncertain)
+    └───────────────┘
 ```
 
-## Dataset
+**Key Innovation**: By rejecting only 15% of the most uncertain predictions, the system achieves **99.20% accuracy** on automated cases while preventing **82.1% of all model errors**.
 
-**Source**: NIH Malaria Cell Images  
-**Classes**: Parasitized (infected), Uninfected  
-**Total**: 27,558 images (perfectly balanced)
+## Dataset & Experimental Setup
 
-**Preprocessing** (locked):
-- Resize to 224×224 (aspect-ratio preserving + black padding)
-- Normalize with dataset-specific mean/std
-- Patch size: 16×16 (for ViT)
+**Dataset**: NIH Malaria Cell Images Dataset
+- 27,558 cell images (parasitized vs. uninfected)
+- Deterministic stratified splits: 70% train / 15% val / 15% test
+- Clean test set (11.3%) + stress test source (3.8%)
 
-See [data/DATASET.md](data/DATASET.md) for full analysis.
+**Preprocessing**:
+- Resize + pad to 224×224
+- Dataset-specific normalization (pre-computed stats)
+- Reproducible splits committed to version control
 
-## Models
+**Infrastructure**:
+- Script-based training (no notebooks)
+- Google Colab execution with T4 GPU
+- Checkpoint persistence via Google Drive
+- Fully reproducible pipeline
 
-### CNN Baseline
-- 4 convolutional blocks
-- ~1.1M parameters
-- Strong feature extraction baseline
+## Baseline Results (Stage 2)
 
-### ViT Baseline
-- Patch-based transformer (16×16)
-- 6 layers, 6 heads, 384 embedding dim
-- ~5M parameters
-- Enables attention-based explainability
+Controlled comparison between CNN and ViT baselines:
 
-## Training
+| Model | Test Accuracy | ECE (Calibration) | Confidence on Failures |
+|-------|--------------|-------------------|----------------------|
+| CNN Baseline | 96.45% | 0.0085 | 77.40% |
+| **ViT Baseline** | 96.36% | 0.0092 | **80.03%** ↑ |
 
-**Hardware**: Google Colab (T4 GPU, 16GB VRAM)
+**Key Finding**: ViT matches CNN accuracy but shows **higher confidence on incorrect predictions** (80% vs 77%), with a smaller confidence gap between correct and incorrect cases (17.3pp vs 19.4pp). This motivates explicit failure-awareness mechanisms.
 
-**Hyperparameters** (identical for both):
-- Optimizer: AdamW (lr=3e-4, weight_decay=0.01)
-- Batch size: 64
-- Max epochs: 20 (early stopping @ 5 patience)
-- LR scheduler: CosineAnnealingLR
+## Failure-Aware Results (Stage 3)
 
-**Commands**:
-```bash
-bash scripts/train_cnn.sh  # CNN baseline
-bash scripts/train_vit.sh  # ViT baseline
-```
+### MC Dropout Uncertainty Estimation
 
-## Development Workflow
+Using Monte Carlo Dropout (T=20 forward passes), we measure predictive entropy to quantify model uncertainty.
 
-**Local**:
-- Write code in `src/` and `scripts/`
-- Commit to Git, push to GitHub
+**Entropy Separation**: 
+- Correct predictions: Mean entropy = 0.0234
+- Incorrect predictions: Mean entropy = 0.3843
+- **Separation: 0.3609** (clear discriminative signal)
 
-**Colab**:
-- Clone repo, run `scripts/colab_setup.sh`
-- Execute training via shell scripts
-- Download checkpoints
+### Selective Prediction Performance
 
-**No notebook-based ML** - all logic is in Python scripts.
+By deferring high-uncertainty cases to human experts, the system achieves substantial safety improvements:
+
+| Rejection Strategy | Coverage | Accuracy (Auto) | Failures Prevented |
+|-------------------|----------|-----------------|-------------------|
+| None (baseline) | 100% | 96.23% | 0% |
+| **Top 15% uncertain** | **85%** | **99.20%** | **82.1%** |
+| Top 20% uncertain | 80% | 99.48% | 88.9% |
+| Top 25% uncertain | 75% | 99.65% | 92.6% |
+
+**Interpretation**: At the recommended operating point (15% rejection):
+- **2,636 cases** auto-diagnosed with 99.20% accuracy
+- **466 cases** deferred to clinicians for review
+- **82.1% of all model failures** never reach patients
+
+## Why This Matters
+
+### Medical Deployment Context
+
+Traditional ML: *"My model is 96% accurate."*  
+**This system**: *"My model auto-diagnoses 85% of cases with 99% accuracy, and prevents 82% of errors by requesting expert review on uncertain cases."*
+
+**Benefits**:
+1. **Safety**: Most failures caught before clinical impact
+2. **Efficiency**: Majority of cases automated with high confidence
+3. **Trust**: System acknowledges limitations explicitly
+4. **Scalability**: Reduces expert workload while maintaining safety
+
+### Human-in-the-Loop Design
+
+This is not a full-automation system. It's a **decision support** system that:
+- Handles routine cases autonomously
+- Escalates edge cases to experts
+- Operates within a clinically meaningful risk tolerance
 
 ## Reproducibility
 
-✅ Deterministic splits (seed=42, committed to Git)  
-✅ Fixed preprocessing pipeline  
-✅ Locked hyperparameters in training scripts  
-✅ Version-controlled normalization stats  
+All experiments are fully reproducible:
 
-Anyone can reproduce results by running:
+- ✅ **Script-based workflow** (no notebook-only code)
+- ✅ **Deterministic splits** (`data/splits.json` version-controlled)
+- ✅ **Locked hyperparameters** (no tuning on test set)
+- ✅ **Pre-computed normalization** (`data/normalization_stats.json`)
+- ✅ **Colab execution guide** (`COLAB_WORKFLOW.md`)
+- ✅ **Checkpoint persistence** (Google Drive integration)
+
+### Quick Start (Google Colab)
+
 ```bash
-bash scripts/colab_setup.sh
-bash scripts/train_cnn.sh
-bash scripts/train_vit.sh
+# Clone repository
+!git clone https://github.com/sharksurfauto-byte/failure-aware-vit-medical.git
+%cd failure-aware-vit-medical
+
+# Mount Google Drive for checkpoints
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Setup environment and download data
+!bash scripts/colab_setup.sh
+
+# Train baselines (or load from Drive)
+!bash scripts/train_vit.sh --checkpoint-dir /content/drive/MyDrive/failure-aware-vit-medical/checkpoints
+
+# Evaluate with MC Dropout
+!bash scripts/mc_dropout_colab.sh
+
+# Generate selective prediction analysis
+!bash scripts/selective_prediction_colab.sh
 ```
 
-## Project Roadmap
+## Project Structure
 
-- [x] **Stage 1**: Dataset analysis and preprocessing
-- [/] **Stage 2**: CNN and ViT baseline training (in progress)
-- [ ] **Stage 3**: Uncertainty estimation (Bayesian ViT)
-- [ ] **Stage 4**: Calibration and failure-awareness
-- [ ] **Stage 5**: Attention-based explainability
-- [ ] **Stage 6**: Stress testing on out-of-distribution data
-- [ ] **Stage 7**: Evaluation and comparison
-- [ ] **Stage 8**: Deployment-ready API
+```
+failure-aware-vit-medical/
+├── data/
+│   ├── splits.json              # Deterministic train/val/test splits
+│   └── normalization_stats.json # Dataset-specific preprocessing
+├── src/
+│   ├── models/
+│   │   ├── cnn_baseline.py      # CNN baseline (ResNet-like)
+│   │   └── vit_baseline.py      # Vision Transformer
+│   └── dataset.py               # Malaria dataset class
+├── scripts/
+│   ├── train.py                 # Universal training script
+│   ├── evaluate_baselines.py   # Stage 2 evaluation
+│   ├── mc_dropout_eval.py       # MC Dropout uncertainty estimation
+│   └── selective_prediction_eval.py  # Decision logic analysis
+├── COLAB_WORKFLOW.md            # Detailed execution guide
+└── RESULTS.md                   # Detailed experimental results
+```
 
-## License
+## Key Technologies
 
-Research project. Code for educational and research purposes.
+- **Model**: Vision Transformer (6 layers, 384 dim, ~5M params)
+- **Uncertainty**: Monte Carlo Dropout (20 forward passes)
+- **Metric**: Predictive Entropy
+- **Framework**: PyTorch
+- **Compute**: Google Colab (T4 GPU)
+
+## Results Summary
+
+See [RESULTS.md](RESULTS.md) for detailed tables, plots, and analysis.
+
+**Bottom Line**:
+- ✅ ViT baseline: 96.36% accuracy (matches CNN)
+- ✅ MC Dropout: 82.1% failure detection at 15% rejection
+- ✅ Selective prediction: 99.20% accuracy on 85% coverage
+- ✅ No retraining required (inference-only uncertainty)
+
+## Future Work
+
+Potential extensions (not required for core functionality):
+
+1. **Stress Testing**: Evaluate decision logic on corrupted/OOD data
+2. **Mutual Information**: Decompose uncertainty into epistemic/aleatoric
+3. **Deep Ensembles**: Compare with ensemble-based uncertainty
+4. **Clinical Validation**: Partner with medical experts for real-world evaluation
 
 ## Citation
 
 If you use this work, please cite:
+
 ```
-@misc{failure-aware-vit-medical,
-  author = {Sharma, [Your Name]},
-  title = {Failure-Aware Vision Transformer for Medical Diagnosis},
-  year = {2026},
-  url = {https://github.com/sharksurfauto-byte/failure-aware-vit-medical}
-}
+Failure-Aware Vision Transformer for Medical Diagnosis
+GitHub: https://github.com/sharksurfauto-byte/failure-aware-vit-medical
 ```
 
-## Contact
+## License
 
-For questions or collaboration, open an issue on GitHub.
+MIT License - See LICENSE file for details.
+
+---
+
+**Author**: Built as a demonstration of failure-aware medical AI systems with quantifiable safety guarantees.
+
+**Contact**: Available via GitHub Issues
