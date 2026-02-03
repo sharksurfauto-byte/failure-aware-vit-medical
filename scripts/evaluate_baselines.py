@@ -251,6 +251,17 @@ def main():
     
     print(f"Using device: {device}")
     
+    # Load normalization stats
+    print("\nLoading normalization stats...")
+    norm_stats_path = PROJECT_ROOT / 'data' / 'normalization_stats.json'
+    with open(norm_stats_path, 'r') as f:
+        norm_stats = json.load(f)
+    
+    # Set class variables
+    MalariaDataset.MEAN = norm_stats['mean']
+    MalariaDataset.STD = norm_stats['std']
+    print(f"Loaded stats: mean={norm_stats['mean']}, std={norm_stats['std']}")
+    
     # Load test dataset
     print("\nLoading test dataset...")
     test_dataset = MalariaDataset(
