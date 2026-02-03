@@ -198,9 +198,6 @@ Failure-Aware Vision Transformer for Medical Diagnosis
 GitHub: https://github.com/sharksurfauto-byte/failure-aware-vit-medical
 ```
 
-## License
-
-MIT License - See LICENSE file for details.
 
 ---
 
