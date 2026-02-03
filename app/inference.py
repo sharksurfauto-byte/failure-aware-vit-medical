@@ -143,8 +143,9 @@ def analyze_image(pil_img: Image.Image, model) -> dict:
     # Decision: AUTO if low uncertainty, REVIEW if high
     decision = "AUTO" if entropy <= ENTROPY_THRESHOLD else "REVIEW"
     
-    # Class names
-    class_names = ["Parasitized", "Uninfected"]
+    # Class names (IMPORTANT: Must match training label order)
+    # Label 0 = Uninfected, Label 1 = Parasitized
+    class_names = ["Uninfected", "Parasitized"]
     prediction = class_names[pred_idx]
     
     return {
