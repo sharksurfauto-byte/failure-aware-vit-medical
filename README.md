@@ -145,6 +145,9 @@ drive.mount('/content/drive')
 
 ```
 failure-aware-vit-medical/
+├── app/                         # Deployment API
+│   ├── main.py                  # FastAPI service
+│   └── inference.py             # MC Dropout inference + decision logic
 ├── data/
 │   ├── splits.json              # Deterministic train/val/test splits
 │   └── normalization_stats.json # Dataset-specific preprocessing
@@ -162,12 +165,73 @@ failure-aware-vit-medical/
 └── RESULTS.md                   # Detailed experimental results
 ```
 
+## Deployment
+
+A minimal FastAPI service demonstrates deployment-ready behavior. The API exposes uncertainty-aware decision logic, automatically predicting low-risk cases while flagging high-uncertainty inputs for human review.
+
+### Running the API
+
+**Local**:
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Ensure checkpoint is available
+# Place vit_best.pt in checkpoints/ directory
+
+# Run API
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+**Docker** (optional):
+```bash
+docker build -t malaria-diagnosis-api .
+docker run -p 8000:8000 -v /path/to/checkpoints:/app/checkpoints malaria-diagnosis-api
+```
+
+### API Endpoints
+
+**POST /analyze** - Analyze malaria cell image
+- Input: image file (multipart/form-data)
+- Output: prediction, confidence, entropy, decision (AUTO/REVIEW)
+
+**GET /health** - Health check
+
+**GET /info** - API information and decision logic
+
+### Example Usage
+
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/analyze",
+    files={"image": open("cell_image.png", "rb")}
+)
+
+result = response.json()
+# {
+#   "prediction": "Parasitized",
+#   "confidence": 0.9918,
+#   "entropy": 0.0421,
+#   "decision": "AUTO",
+#   "threshold": 0.2015
+# }
+```
+
+**Decision Logic**:
+- `entropy ≤ 0.2015` → **AUTO** (safe to auto-predict, ~85% of cases)
+- `entropy > 0.2015` → **REVIEW** (flag for expert review, ~15% of cases)
+
+Visit `http://localhost:8000/docs` for interactive Swagger UI.
+
 ## Key Technologies
 
 - **Model**: Vision Transformer (6 layers, 384 dim, ~5M params)
 - **Uncertainty**: Monte Carlo Dropout (20 forward passes)
 - **Metric**: Predictive Entropy
 - **Framework**: PyTorch
+- **API**: FastAPI + Uvicorn
 - **Compute**: Google Colab (T4 GPU)
 
 ## Results Summary
