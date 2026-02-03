@@ -11,7 +11,8 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from app.inference import analyze_image, load_model
@@ -28,6 +29,12 @@ app = FastAPI(
     description="Human-in-the-loop medical AI: auto-predicts low-risk cases, flags uncertain ones for expert review",
     version="1.1.0"
 )
+
+# Mount static files for web UI
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 
 # Load model at startup
 model = None
@@ -48,7 +55,10 @@ async def startup_event():
 
 @app.get("/")
 def root():
-    """Root endpoint - redirect to docs."""
+    """Serve the web UI."""
+    static_file = Path(__file__).parent / "static" / "index.html"
+    if static_file.exists():
+        return FileResponse(static_file)
     return {
         "message": "Failure-Aware Malaria Diagnosis API",
         "docs": "/docs",
