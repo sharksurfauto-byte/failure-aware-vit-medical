@@ -169,6 +169,8 @@ failure-aware-vit-medical/
 
 A minimal FastAPI service demonstrates deployment-ready behavior. The API exposes uncertainty-aware decision logic, automatically predicting low-risk cases while flagging high-uncertainty inputs for human review.
 
+**Note**: This is a demo of decision logic, not a production medical device.
+
 ### Running the API
 
 **Local**:

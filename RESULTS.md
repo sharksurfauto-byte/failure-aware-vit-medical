@@ -86,6 +86,8 @@ For each sample:
 | Top 25% uncertain | 75.0% | 99.65% | +3.42pp | 92.6% |
 | Top 30% uncertain | 70.0% | 99.77% | +3.54pp | 95.6% |
 
+**Note**: Thresholds are percentile-based, making them dataset-agnostic.
+
 ### Recommended Operating Point
 
 **15% Rejection** (85% coverage):
